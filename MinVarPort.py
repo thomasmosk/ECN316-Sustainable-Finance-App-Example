@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 # --- Page configuration ---
 st.set_page_config(
@@ -43,14 +43,16 @@ with tab1:
     col2.metric("Asset 2 Weight", f"{w_mvp_2:.2f}")
 
     st.subheader("Portfolio Allocation")
-    fig_alloc = go.Figure(data=[go.Pie(
-        labels=["Asset 1", "Asset 2"],
-        values=[w_mvp, w_mvp_2],
-        hole=0.4,
-        marker=dict(colors=["#636EFA", "#EF553B"])
-    )])
-    fig_alloc.update_layout(showlegend=True)
-    st.plotly_chart(fig_alloc, use_container_width=True)
+    # Pie chart for portfolio allocation
+    fig, ax = plt.subplots()
+    ax.pie([w_mvp, w_mvp_2],
+           labels=["Asset 1", "Asset 2"],
+           autopct="%1.1f%%",
+           colors=["#636EFA", "#EF553B"],
+           startangle=90,
+           wedgeprops={'edgecolor': 'black'})
+    ax.axis('equal')  # Equal aspect ratio ensures the pie is circular.
+    st.pyplot(fig)
 
 with tab2:
     # Portfolio returns and risk for plotting efficient frontier
@@ -59,19 +61,19 @@ with tab2:
     port_risks = np.sqrt(weights**2 * sd1**2 + (1 - weights)**2 * sd2**2 + 2 * weights * (1 - weights) * cov12)
 
     # Plot efficient frontier
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=port_risks, y=port_returns, mode="lines", name="Efficient Frontier"))
-    fig.add_trace(go.Scatter(
-        x=[np.sqrt(w_mvp**2 * sd1**2 + w_mvp_2**2 * sd2**2 + 2*w_mvp*w_mvp_2*cov12)],
-        y=[w_mvp*r1 + w_mvp_2*r2],
-        mode="markers",
-        marker=dict(color="red", size=12),
-        name="Minimum Variance Portfolio"
-    ))
-    fig.update_layout(
-        title="Efficient Frontier",
-        xaxis_title="Portfolio Standard Deviation",
-        yaxis_title="Portfolio Return",
-        template="plotly_dark"
+    fig, ax = plt.subplots()
+    ax.plot(port_risks, port_returns, label="Efficient Frontier", color="#636EFA")
+    ax.scatter(
+        np.sqrt(w_mvp**2 * sd1**2 + w_mvp_2**2 * sd2**2 + 2 * w_mvp * w_mvp_2 * cov12),
+        w_mvp*r1 + w_mvp_2*r2,
+        color="red",
+        label="Minimum Variance Portfolio",
+        zorder=5,
+        s=100
     )
-    st.plotly_chart(fig, use_container_width=True)
+    ax.set_xlabel("Portfolio Standard Deviation")
+    ax.set_ylabel("Portfolio Return")
+    ax.set_title("Efficient Frontier")
+    ax.legend()
+    ax.grid(True, linestyle='--', alpha=0.5)
+    st.pyplot(fig)
