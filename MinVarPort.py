@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize_scalar
 
 # --- Page configuration ---
 st.set_page_config(
@@ -59,25 +58,35 @@ def portfolio_sd(w1, sd1, sd2, rho):
     """Calculate portfolio standard deviation"""
     return np.sqrt(w1**2 * sd1**2 + (1-w1)**2 * sd2**2 + 2 * rho * w1 * (1-w1) * sd1 * sd2)
 
-def sharpe_ratio(w1):
-    """Calculate negative Sharpe ratio for minimization"""
-    ret = portfolio_ret(w1, r_h, r_f)
-    sd = portfolio_sd(w1, sd_h, sd_f, rho_hf)
-    if sd == 0:
-        return np.inf
-    return -(ret - r_free) / sd
+def find_tangency_portfolio(r1, r2, sd1, sd2, rho, rf):
+    """Find tangency portfolio using grid search"""
+    weights = np.linspace(0, 1, 1000)
+    sharpe_ratios = []
+    
+    for w in weights:
+        ret = portfolio_ret(w, r1, r2)
+        sd = portfolio_sd(w, sd1, sd2, rho)
+        if sd > 0:
+            sharpe = (ret - rf) / sd
+            sharpe_ratios.append(sharpe)
+        else:
+            sharpe_ratios.append(-np.inf)
+    
+    max_idx = np.argmax(sharpe_ratios)
+    return weights[max_idx], sharpe_ratios[max_idx]
 
 # Find tangency portfolio
-result_tangency = minimize_scalar(sharpe_ratio, bounds=(0, 1), method='bounded')
-w1_tangency = result_tangency.x
+w1_tangency, sharpe_tangency = find_tangency_portfolio(r_h, r_f, sd_h, sd_f, rho_hf, r_free)
 w2_tangency = 1 - w1_tangency
 
 ret_tangency = portfolio_ret(w1_tangency, r_h, r_f)
 sd_tangency = portfolio_sd(w1_tangency, sd_h, sd_f, rho_hf)
-sharpe_tangency = (ret_tangency - r_free) / sd_tangency
 
 # Find optimal portfolio based on utility
-w_tangency_optimal = (ret_tangency - r_free) / (gamma * sd_tangency**2)
+if sd_tangency > 0:
+    w_tangency_optimal = (ret_tangency - r_free) / (gamma * sd_tangency**2)
+else:
+    w_tangency_optimal = 0
 
 # Complete portfolio weights
 w1_optimal = w_tangency_optimal * w1_tangency
@@ -86,7 +95,7 @@ w_rf_optimal = 1 - w_tangency_optimal
 
 # Optimal portfolio characteristics
 ret_optimal = r_free + w_tangency_optimal * (ret_tangency - r_free)
-sd_optimal = w_tangency_optimal * sd_tangency
+sd_optimal = abs(w_tangency_optimal) * sd_tangency
 utility_optimal = ret_optimal - (gamma / 2) * sd_optimal**2
 
 # --- Tabs for organized layout ---
@@ -175,7 +184,7 @@ with tab2:
     # 2. Capital Market Line
     sd_max = max(sds_frontier) * 1.3
     sd_cml = np.linspace(0, sd_max, 100)
-    ret_cml = r_free + (ret_tangency - r_free) / sd_tangency * sd_cml
+    ret_cml = r_free + (ret_tangency - r_free) / sd_tangency * sd_cml if sd_tangency > 0 else r_free * np.ones_like(sd_cml)
     ax.plot(sd_cml, ret_cml, 'g--', linewidth=2.5, label='Capital Market Line (CML)', alpha=0.8)
     
     # 3. Tangency portfolio
@@ -293,9 +302,9 @@ with tab3:
     st.subheader("🔍 Sensitivity Analysis: Impact of Risk Aversion")
     
     gamma_range = np.linspace(0.5, 10, 50)
-    w_tangency_range = [(ret_tangency - r_free) / (g * sd_tangency**2) for g in gamma_range]
+    w_tangency_range = [(ret_tangency - r_free) / (g * sd_tangency**2) if sd_tangency > 0 else 0 for g in gamma_range]
     ret_range = [r_free + w * (ret_tangency - r_free) for w in w_tangency_range]
-    sd_range = [w * sd_tangency for w in w_tangency_range]
+    sd_range = [abs(w) * sd_tangency for w in w_tangency_range]
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     
