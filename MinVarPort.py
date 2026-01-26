@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 
 st.title("🎯 Portfolio Optimizer")
 
@@ -62,14 +63,54 @@ ret_optimal = r_free + w_tangency_optimal * (ret_tangency - r_free)
 sd_optimal = abs(w_tangency_optimal) * sd_tangency
 
 # Display results
-st.header("Your Optimal Portfolio")
+tab1, tab2 = st.tabs(["📊 Results", "📈 Graph"])
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Risk-Free Asset", f"{w_rf_optimal*100:.2f}%")
-col2.metric("Asset 1", f"{w1_optimal*100:.2f}%")
-col3.metric("Asset 2", f"{w2_optimal*100:.2f}%")
+with tab1:
+    st.header("Your Optimal Portfolio")
 
-st.write("")
-col1, col2 = st.columns(2)
-col1.metric("Expected Return", f"{ret_optimal*100:.2f}%")
-col2.metric("Risk (Std Dev)", f"{sd_optimal*100:.2f}%")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Risk-Free Asset", f"{w_rf_optimal*100:.2f}%")
+    col2.metric("Asset 1", f"{w1_optimal*100:.2f}%")
+    col3.metric("Asset 2", f"{w2_optimal*100:.2f}%")
+
+    st.write("")
+    col1, col2 = st.columns(2)
+    col1.metric("Expected Return", f"{ret_optimal*100:.2f}%")
+    col2.metric("Risk (Std Dev)", f"{sd_optimal*100:.2f}%")
+
+with tab2:
+    st.header("Portfolio Visualization")
+    
+    # Generate efficient frontier
+    weights_plot = np.linspace(0, 1, 200)
+    returns_frontier = [portfolio_ret(w, r_h, r_f) for w in weights_plot]
+    sds_frontier = [portfolio_sd(w, sd_h, sd_f, rho_hf) for w in weights_plot]
+    
+    # Create plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Efficient frontier
+    ax.plot(sds_frontier, returns_frontier, 'b-', linewidth=2, label='Efficient Frontier')
+    
+    # Capital Market Line
+    sd_max = max(sds_frontier) * 1.2
+    sd_cml = np.linspace(0, sd_max, 100)
+    ret_cml = r_free + (ret_tangency - r_free) / sd_tangency * sd_cml if sd_tangency > 0 else r_free * np.ones_like(sd_cml)
+    ax.plot(sd_cml, ret_cml, 'g--', linewidth=2, label='Capital Market Line')
+    
+    # Tangency portfolio
+    ax.scatter(sd_tangency, ret_tangency, color='red', s=200, zorder=5, marker='*', label='Tangency Portfolio')
+    
+    # Optimal portfolio
+    ax.scatter(sd_optimal, ret_optimal, color='orange', s=200, zorder=5, marker='D', label='Your Optimal Portfolio')
+    
+    # Risk-free asset
+    ax.scatter(0, r_free, color='green', s=150, zorder=5, marker='s', label='Risk-Free Asset')
+    
+    ax.set_xlabel('Risk (Standard Deviation)')
+    ax.set_ylabel('Expected Return')
+    ax.set_title('Portfolio Optimization')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    st.pyplot(fig)
